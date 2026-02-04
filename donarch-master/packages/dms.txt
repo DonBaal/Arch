@@ -1,0 +1,5 @@
+dms-shell-git
+noctalia-shell-git
+quickshell
+greetd
+greetd-dms-greeter-git
