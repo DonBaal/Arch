@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# DonArch Installer
-# Don's Arch Configurations for Hyprland & Niri with DankMaterialShell
+# DonBaal Installer
+# DonBaal´s Arch Configurations for Hyprland & Niri with DankMaterialShell
 
 set -euo pipefail
 
