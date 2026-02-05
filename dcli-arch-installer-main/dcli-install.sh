@@ -1233,6 +1233,13 @@ install_critical_packages() {
         packages+=" zram-generator"
     fi
 
+    # Enable multilib repository for 32-bit packages
+    if echo "$packages" | grep -q "lib32-"; then
+        show_info "Enabling multilib repository for 32-bit packages..."
+        sed -i '/^\[multilib\]/,/^Include/ s/^#//' "$MOUNTPOINT/etc/pacman.conf"
+        arch-chroot "$MOUNTPOINT" pacman -Sy --noconfirm
+    fi
+
     # Install packages
     arch-chroot "$MOUNTPOINT" pacman -S --noconfirm $packages
 
