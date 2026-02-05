@@ -99,6 +99,57 @@ check_uefi() {
     fi
 }
 
+cleanup_disk() {
+    local disk="$1"
+    
+    [[ -z "$disk" ]] && return 0
+    [[ ! -b "$disk" ]] && return 0
+    
+    echo "Cleaning up disk $disk..."
+    
+    # Unmount all partitions on this disk (including /mnt and subdirs)
+    for mount_point in $(mount | grep "^${disk}" | awk '{print $3}' | sort -r); do
+        echo "  Unmounting: $mount_point"
+        umount -R "$mount_point" 2>/dev/null || umount -l "$mount_point" 2>/dev/null || true
+    done
+    
+    # Also check /mnt specifically
+    if mount | grep -q " $MOUNTPOINT "; then
+        echo "  Unmounting: $MOUNTPOINT"
+        umount -R "$MOUNTPOINT" 2>/dev/null || umount -l "$MOUNTPOINT" 2>/dev/null || true
+    fi
+    
+    # Disable all swap
+    swapoff -a 2>/dev/null || true
+    
+    # Close any cryptsetup/LVM on this disk
+    for mapper in /dev/mapper/*; do
+        [[ -b "$mapper" ]] && cryptsetup close "$mapper" 2>/dev/null || true
+    done
+    
+    # Remove device mapper entries for this disk
+    dmsetup remove_all 2>/dev/null || true
+    
+    # Kill any processes using the disk
+    fuser -km "$disk" 2>/dev/null || true
+    
+    # Wait for everything to settle
+    sleep 2
+    sync
+    
+    # Final cleanup
+    wipefs -af "$disk" 2>/dev/null || true
+    dd if=/dev/zero of="$disk" bs=1M count=10 conv=notrunc 2>/dev/null || true
+    
+    # Inform kernel
+    blockdev --rereadpt "$disk" 2>/dev/null || true
+    partprobe "$disk" 2>/dev/null || true
+    udevadm settle
+    
+    echo "Disk cleanup complete"
+    sleep 1
+}
+
 # ════════════════════════════════════════════════════════════════════════════════
 # GUM UI HELPERS
 # ════════════════════════════════════════════════════════════════════════════════
@@ -954,26 +1005,8 @@ partition_disk() {
 
     [[ -n "$disk" ]] || { echo "ERROR: CONFIG[disk] is empty"; exit 1; }
 
-    # Unmount any mounted partitions on this disk
-    echo "Unmounting any partitions on $disk..."
-    for part in "${disk}"*; do
-        if mountpoint -q "$part" 2>/dev/null; then
-            umount -f "$part" 2>/dev/null || true
-        fi
-    done
-
-    # Disable swap if any partition on this disk is used as swap
-    swapoff -a 2>/dev/null || true
-
-    # Clear partition table and signatures
-    wipefs -af "$disk" 2>/dev/null || true
-    sgdisk -Z "$disk" &>/dev/null || true
-    dd if=/dev/zero of="$disk" bs=512 count=1 conv=notrunc 2>/dev/null || true
-
-    # Wait for kernel to update
-    sleep 2
-    partprobe "$disk" 2>/dev/null || true
-    udevadm settle
+    # Comprehensive cleanup before partitioning
+    cleanup_disk "$disk"
 
     if [[ "${CONFIG[uefi]}" == "yes" ]]; then
         parted -s "$disk" mklabel gpt
