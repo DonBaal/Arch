@@ -11,7 +11,7 @@
 set -e
 
 # Configuration
-REPO_URL=" https://raw.githubusercontent.com/DonBaal/Arch/main/dcli-arch-installer-main"
+REPO_URL="https://raw.githubusercontent.com/DonBaal/Arch/refs/heads/main/dcli-arch-installer-main"
 
 # Colors
 RED='\033[0;31m'
