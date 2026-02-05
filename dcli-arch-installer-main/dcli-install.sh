@@ -1270,6 +1270,12 @@ install_critical_packages() {
     if echo "$packages" | grep -q "lib32-"; then
         show_info "Enabling multilib repository for 32-bit packages..."
         
+        # Copy mirrorlist to chroot if not exists or is from live ISO
+        if [[ ! -f "$MOUNTPOINT/etc/pacman.d/mirrorlist" ]] || [[ $(wc -l < "$MOUNTPOINT/etc/pacman.d/mirrorlist") -lt 10 ]]; then
+            show_info "Updating mirrorlist..."
+            cp /etc/pacman.d/mirrorlist "$MOUNTPOINT/etc/pacman.d/mirrorlist" 2>/dev/null || true
+        fi
+        
         # Check if multilib is already enabled
         if ! grep -q "^\[multilib\]" "$MOUNTPOINT/etc/pacman.conf"; then
             # Multilib section is commented, uncomment it
@@ -1279,8 +1285,31 @@ install_critical_packages() {
         
         # Verify multilib is enabled
         if grep -q "^\[multilib\]" "$MOUNTPOINT/etc/pacman.conf"; then
-            show_info "Multilib repository enabled, updating package database..."
-            arch-chroot "$MOUNTPOINT" pacman -Sy --noconfirm
+            show_info "Multilib repository enabled, initializing package database..."
+            
+            # Initialize pacman keyring first
+            arch-chroot "$MOUNTPOINT" pacman-key --init 2>/dev/null || true
+            arch-chroot "$MOUNTPOINT" pacman-key --populate archlinux 2>/dev/null || true
+            
+            # Update package database with retry
+            local retry_count=0
+            local max_retries=3
+            while [[ $retry_count -lt $max_retries ]]; do
+                if arch-chroot "$MOUNTPOINT" pacman -Sy --noconfirm 2>&1; then
+                    show_info "Package database updated successfully"
+                    break
+                else
+                    retry_count=$((retry_count + 1))
+                    if [[ $retry_count -lt $max_retries ]]; then
+                        show_warning "Database update failed, retrying ($retry_count/$max_retries)..."
+                        sleep 3
+                    else
+                        show_warning "Failed to update package database after $max_retries attempts"
+                        show_warning "Removing lib32 packages from installation..."
+                        packages=$(echo "$packages" | sed 's/lib32-[^ ]*//g')
+                    fi
+                fi
+            done
         else
             show_warning "Failed to enable multilib, removing lib32 packages from installation..."
             packages=$(echo "$packages" | sed 's/lib32-[^ ]*//g')
