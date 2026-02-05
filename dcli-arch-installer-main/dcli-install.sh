@@ -1236,11 +1236,26 @@ install_critical_packages() {
     # Enable multilib repository for 32-bit packages
     if echo "$packages" | grep -q "lib32-"; then
         show_info "Enabling multilib repository for 32-bit packages..."
-        sed -i '/^\[multilib\]/,/^Include/ s/^#//' "$MOUNTPOINT/etc/pacman.conf"
-        arch-chroot "$MOUNTPOINT" pacman -Sy --noconfirm
+        
+        # Check if multilib is already enabled
+        if ! grep -q "^\[multilib\]" "$MOUNTPOINT/etc/pacman.conf"; then
+            # Multilib section is commented, uncomment it
+            sed -i '/^#\[multilib\]/s/^#//' "$MOUNTPOINT/etc/pacman.conf"
+            sed -i '/^\[multilib\]/,/^Include/ s/^#//' "$MOUNTPOINT/etc/pacman.conf"
+        fi
+        
+        # Verify multilib is enabled
+        if grep -q "^\[multilib\]" "$MOUNTPOINT/etc/pacman.conf"; then
+            show_info "Multilib repository enabled, updating package database..."
+            arch-chroot "$MOUNTPOINT" pacman -Sy --noconfirm
+        else
+            show_warning "Failed to enable multilib, removing lib32 packages from installation..."
+            packages=$(echo "$packages" | sed 's/lib32-[^ ]*//g')
+        fi
     fi
 
     # Install packages
+    show_info "Installing packages..."
     arch-chroot "$MOUNTPOINT" pacman -S --noconfirm $packages
 
     # Enable display manager (best effort)
