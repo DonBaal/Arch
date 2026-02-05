@@ -130,17 +130,6 @@ download_and_run() {
     else
         log_error "Failed to download installer"
         log_info "Attempting to clone full repository..."
-        
-        # Fallback: clone the repo
-        if git clone --depth 1 https://gitlab.com/theblackdon/dcli-arch-installer.git "$INSTALL_DIR/repo" 2>/dev/null; then
-            cp "$INSTALL_DIR/repo/dcli-install.sh" ./dcli-install.sh
-            cp -r "$INSTALL_DIR/repo/modules" ./modules
-            chmod +x dcli-install.sh
-            log_info "Repository cloned"
-        else
-            log_error "Failed to download installer. Please check your internet connection."
-            exit 1
-        fi
     fi
     
     # Download modules directory
