@@ -954,8 +954,26 @@ partition_disk() {
 
     [[ -n "$disk" ]] || { echo "ERROR: CONFIG[disk] is empty"; exit 1; }
 
+    # Unmount any mounted partitions on this disk
+    echo "Unmounting any partitions on $disk..."
+    for part in "${disk}"*; do
+        if mountpoint -q "$part" 2>/dev/null; then
+            umount -f "$part" 2>/dev/null || true
+        fi
+    done
+
+    # Disable swap if any partition on this disk is used as swap
+    swapoff -a 2>/dev/null || true
+
+    # Clear partition table and signatures
     wipefs -af "$disk" 2>/dev/null || true
     sgdisk -Z "$disk" &>/dev/null || true
+    dd if=/dev/zero of="$disk" bs=512 count=1 conv=notrunc 2>/dev/null || true
+
+    # Wait for kernel to update
+    sleep 2
+    partprobe "$disk" 2>/dev/null || true
+    udevadm settle
 
     if [[ "${CONFIG[uefi]}" == "yes" ]]; then
         parted -s "$disk" mklabel gpt
