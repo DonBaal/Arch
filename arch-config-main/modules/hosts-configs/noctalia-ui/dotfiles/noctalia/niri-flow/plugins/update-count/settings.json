@@ -1,8 +1,0 @@
-{
-  "updateIntervalMinutes": 30,
-  "updateTerminalCommand": "kitty -e",
-  "currentIconName": "package",
-  "hideOnZero": false,
-  "customCmdGetNumUpdates": "",
-  "customCmdDoSystemUpdate": "dcli update"
-}
