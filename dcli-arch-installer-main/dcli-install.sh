@@ -657,15 +657,15 @@ select_display_manager() {
 }
 
 # ════════════════════════════════════════════════════════════════════════════════
-# 9. DCLI CONFIG FORMAT
+# 9. PackageManagement CONFIG FORMAT
 # ════════════════════════════════════════════════════════════════════════════════
 
 select_config_format() {
     show_header
-    show_submenu_header "9. DCLI Configuration"
+    show_submenu_header "9. PackageManagement Configuration"
     echo ""
 
-    show_info "How would you like to configure DCLI?"
+    show_info "How would you like to configure PackageManagement?"
     echo ""
 
     local config_options=(
@@ -704,7 +704,7 @@ select_config_format() {
 
     elif [[ "$choice" == "clone" ]]; then
         echo ""
-        show_info "Enter the git repository URL for your DCLI config"
+        show_info "Enter the git repository URL for your PackageManagement config"
         echo ""
 
         local repo_url=""
@@ -789,7 +789,7 @@ show_main_menu() {
             " 8. Timezone              | ${CONFIG[timezone]}"
             " 9. Desktop Environment   | ${CONFIG[desktop]//,/, }"
             "10. Display Manager       | ${CONFIG[display_manager]}"
-            "11. DCLI Config Format    | $config_display"
+            "11. PaMa Config Format    | $config_display"
             "-------------------------------------------"
             "12. Start Installation"
             " 0. Exit"

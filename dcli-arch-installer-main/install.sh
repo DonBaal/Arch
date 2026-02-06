@@ -25,16 +25,16 @@ print_banner() {
     echo -e "${PURPLE}"
     clear
     cat << 'EOF'
-    ____  ________    ____
-   / __ \/ ____/ /   /  _/
-  / / / / /   / /    / /  
- / /_/ / /___/ /____/ /   
-/_____/\____/_____/___/   
+    ____              __
+   / __ )____ _____ _/ /
+  / __  / __ `/ __ `/ / 
+ / /_/ / /_/ / /_/ / /  
+/_____/\__,_/\__,_/_/   
                           
  Arch Linux Installer
 EOF
     echo -e "${NC}"
-    echo -e "${CYAN}Declarative Arch Linux installation powered by dcli${NC}"
+    echo -e "${CYAN} Linux installation powered by Baal${NC}"
     echo "=================================================="
     echo ""
 }
