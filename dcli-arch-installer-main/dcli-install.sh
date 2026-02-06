@@ -807,7 +807,7 @@ show_main_menu() {
             *" 6."*) select_graphics_driver ;;
             *" 7."*) configure_authentication ;;
             *" 8."*) select_timezone ;;
-            *" 9."*) select_desktop_environment ;;
+            *" 9."*) select_desktop ;;
             *"10."*) select_display_manager ;;
             *"11."*) select_config_format ;;
             *"12."*)
