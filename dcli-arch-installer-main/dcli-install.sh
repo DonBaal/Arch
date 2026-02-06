@@ -29,8 +29,8 @@ NC='\033[0m'
 # Installation configuration (associative array)
 declare -A CONFIG
 CONFIG[installer_lang]="English"
-CONFIG[locale]="en_US.UTF-8"
-CONFIG[keyboard]="us"
+CONFIG[locale]="de_DE.UTF-8"
+CONFIG[keyboard]="de"
 CONFIG[timezone]="Europe/Berlin"
 CONFIG[hostname]="donbaal"
 CONFIG[username]="baal"
@@ -1324,11 +1324,11 @@ install_bootloader() {
 deploy_donarch_configs() {
     local user_home="$MOUNTPOINT/home/${CONFIG[username]}"
     local config_dir="$user_home/.config"
-    local donarch_source="$SCRIPT_DIR/../donarch-master"
+    local donarch_source="$SCRIPT_DIR/configs"
     
-    # Check if donarch-master exists
+    # Check if configs directory exists
     if [[ ! -d "$donarch_source" ]]; then
-        show_warning "donarch-master not found at $donarch_source, skipping config deployment"
+        show_warning "Configs directory not found at $donarch_source, skipping config deployment"
         return 0
     fi
     
@@ -1353,58 +1353,74 @@ deploy_donarch_configs() {
     local shared_configs=("kitty" "fish" "gtk-3.0" "gtk-4.0" "fastfetch" "noctalia")
     
     for config in "${shared_configs[@]}"; do
-        if [[ -d "$donarch_source/configs/shared/$config" ]]; then
+        if [[ -d "$donarch_source/shared/$config" ]]; then
             mkdir -p "$config_dir/$config"
-            cp -r "$donarch_source/configs/shared/$config"/* "$config_dir/$config/"
+            cp -r "$donarch_source/shared/$config"/* "$config_dir/$config/"
         fi
     done
     
     # Handle Qt configs with HOME variable substitution
     for qt_config in "qt5ct" "qt6ct"; do
-        if [[ -d "$donarch_source/configs/shared/$qt_config" ]]; then
+        if [[ -d "$donarch_source/shared/$qt_config" ]]; then
             mkdir -p "$config_dir/$qt_config"
-            if [[ -f "$donarch_source/configs/shared/$qt_config/${qt_config}.conf" ]]; then
+            if [[ -f "$donarch_source/shared/$qt_config/${qt_config}.conf" ]]; then
                 sed "s|\$HOME|/home/${CONFIG[username]}|g" \
-                    "$donarch_source/configs/shared/$qt_config/${qt_config}.conf" \
+                    "$donarch_source/shared/$qt_config/${qt_config}.conf" \
                     > "$config_dir/$qt_config/${qt_config}.conf"
             fi
         fi
     done
     
     # Deploy Hyprland configs
-    if [[ "$has_hyprland" == "true" && -d "$donarch_source/configs/hyprland" ]]; then
+    if [[ "$has_hyprland" == "true" && -d "$donarch_source/hyprland" ]]; then
         show_info "Deploying Hyprland configurations..."
-        if [[ -d "$donarch_source/configs/hyprland/hypr" ]]; then
+        if [[ -d "$donarch_source/hyprland/hypr" ]]; then
             mkdir -p "$config_dir/hypr"
-            cp -r "$donarch_source/configs/hyprland/hypr"/* "$config_dir/hypr/"
+            cp -r "$donarch_source/hyprland/hypr"/* "$config_dir/hypr/"
+            
+            # Replace shell-switch templates with default values
+            if [[ -f "$config_dir/hypr/shell-start.conf" ]]; then
+                sed -i 's/{{SHELL_NAME}}/DankMaterialShell/g' "$config_dir/hypr/shell-start.conf"
+                sed -i 's|{{LAUNCH_CMD}}|ags|g' "$config_dir/hypr/shell-start.conf"
+            fi
+            
+            if [[ -f "$config_dir/hypr/shell-binds.conf" ]]; then
+                sed -i 's/{{SHELL_NAME}}/DankMaterialShell/g' "$config_dir/hypr/shell-binds.conf"
+                sed -i 's|{{LAUNCHER_CMD}}|wofi --show drun|g' "$config_dir/hypr/shell-binds.conf"
+            fi
+            
+            # Fix Ax-Shell reference in hyprlock.conf
+            if [[ -f "$config_dir/hypr/hyprlock.conf" ]]; then
+                sed -i 's|source = ~/.config/Ax-Shell/config/hypr/colors.conf|# source = ~/.config/Ax-Shell/config/hypr/colors.conf|g' "$config_dir/hypr/hyprlock.conf"
+            fi
         fi
         
         # Deploy DMS configs for Hyprland
-        if [[ -d "$donarch_source/configs/hyprland/DankMaterialShell" ]]; then
+        if [[ -d "$donarch_source/hyprland/DankMaterialShell" ]]; then
             mkdir -p "$config_dir/DankMaterialShell"
-            cp -r "$donarch_source/configs/hyprland/DankMaterialShell"/* "$config_dir/DankMaterialShell/"
+            cp -r "$donarch_source/hyprland/DankMaterialShell"/* "$config_dir/DankMaterialShell/"
         fi
     fi
     
     # Deploy Niri configs
-    if [[ "$has_niri" == "true" && -d "$donarch_source/configs/niri" ]]; then
+    if [[ "$has_niri" == "true" && -d "$donarch_source/niri" ]]; then
         show_info "Deploying Niri configurations..."
-        if [[ -d "$donarch_source/configs/niri/niri" ]]; then
+        if [[ -d "$donarch_source/niri/niri" ]]; then
             mkdir -p "$config_dir/niri"
-            cp -r "$donarch_source/configs/niri/niri"/* "$config_dir/niri/"
+            cp -r "$donarch_source/niri/niri"/* "$config_dir/niri/"
         fi
         
         # Deploy DMS configs for Niri (if Hyprland not installed)
-        if [[ "$has_hyprland" != "true" && -d "$donarch_source/configs/niri/DankMaterialShell" ]]; then
+        if [[ "$has_hyprland" != "true" && -d "$donarch_source/niri/DankMaterialShell" ]]; then
             mkdir -p "$config_dir/DankMaterialShell"
-            cp -r "$donarch_source/configs/niri/DankMaterialShell"/* "$config_dir/DankMaterialShell/"
+            cp -r "$donarch_source/niri/DankMaterialShell"/* "$config_dir/DankMaterialShell/"
         fi
     fi
     
     # Also copy shared DMS configs if they exist
-    if [[ -d "$donarch_source/configs/shared/DankMaterialShell" ]]; then
+    if [[ -d "$donarch_source/shared/DankMaterialShell" ]]; then
         mkdir -p "$config_dir/DankMaterialShell"
-        cp -r "$donarch_source/configs/shared/DankMaterialShell"/* "$config_dir/DankMaterialShell/" 2>/dev/null || true
+        cp -r "$donarch_source/shared/DankMaterialShell"/* "$config_dir/DankMaterialShell/" 2>/dev/null || true
     fi
     
     # Fix permissions
