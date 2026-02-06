@@ -1,9 +1,8 @@
 #!/bin/bash
 #
-# dcli-arch-installer - Main Installer Script
+# Baal´s Arch Installer - Main Installer Script
 #
-# A beautiful, streamlined Arch Linux installer that generates
-# declarative dcli configuration files.
+# A beautiful, fast, streamlined Arch Linux installer that generates
 #
 # License: GPL-3.0
 #
@@ -15,7 +14,7 @@ set -Eeuo pipefail
 # ════════════════════════════════════════════════════════════════════════════════
 
 VERSION="1.0"
-SCRIPT_NAME="DCLI Arch Installer"
+SCRIPT_NAME="Baal´s Arch Installer"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MOUNTPOINT="/mnt"
 
@@ -32,18 +31,18 @@ declare -A CONFIG
 CONFIG[installer_lang]="English"
 CONFIG[locale]="en_US.UTF-8"
 CONFIG[keyboard]="us"
-CONFIG[timezone]="UTC"
-CONFIG[hostname]="archlinux"
-CONFIG[username]=""
+CONFIG[timezone]="Europe/Berlin"
+CONFIG[hostname]="donbaal"
+CONFIG[username]="baal"
 CONFIG[user_password]=""
 CONFIG[root_password]=""
-CONFIG[disk]=""
-CONFIG[filesystem]="ext4"
+CONFIG[disk]="/dev/sda"
+CONFIG[filesystem]="btrfs"
 CONFIG[swap]="zram"
 CONFIG[swap_size]="4G"
-CONFIG[gfx_driver]="mesa-all"
+CONFIG[gfx_driver]="intel"
 CONFIG[desktop]="none"
-CONFIG[display_manager]="none"
+CONFIG[display_manager]="greetd"
 CONFIG[config_format]="lua"
 CONFIG[git_repo]=""
 CONFIG[aur_helper]="paru"
@@ -161,7 +160,7 @@ show_header() {
         --align center --width 70 --margin "1 2" --padding "1 2" \
         "$SCRIPT_NAME v$VERSION" \
         "" \
-        "Declarative Arch Linux installation powered by DCLI"
+        "Baal´s Declarative Arch Linux installation"
 }
 
 show_submenu_header() {
@@ -213,13 +212,6 @@ select_installer_language() {
     local languages=(
         "English"
         "Deutsch (German)"
-        "Espanol (Spanish)"
-        "Francais (French)"
-        "Italiano (Italian)"
-        "Portugues (Portuguese)"
-        "Polski (Polish)"
-        "Nederlands (Dutch)"
-        "Turkce (Turkish)"
     )
 
     local selection=""
@@ -249,28 +241,6 @@ select_locales() {
         "en_US.UTF-8"
         "en_GB.UTF-8"
         "de_DE.UTF-8"
-        "fr_FR.UTF-8"
-        "es_ES.UTF-8"
-        "it_IT.UTF-8"
-        "pt_BR.UTF-8"
-        "pt_PT.UTF-8"
-        "ru_RU.UTF-8"
-        "ja_JP.UTF-8"
-        "ko_KR.UTF-8"
-        "zh_CN.UTF-8"
-        "zh_TW.UTF-8"
-        "pl_PL.UTF-8"
-        "nl_NL.UTF-8"
-        "tr_TR.UTF-8"
-        "sv_SE.UTF-8"
-        "da_DK.UTF-8"
-        "fi_FI.UTF-8"
-        "nb_NO.UTF-8"
-        "cs_CZ.UTF-8"
-        "hu_HU.UTF-8"
-        "el_GR.UTF-8"
-        "uk_UA.UTF-8"
-        "ro_RO.UTF-8"
     )
 
     local locale_selection=""
@@ -287,31 +257,7 @@ select_locales() {
 
     local keyboards=(
         "us"
-        "uk"
         "de"
-        "fr"
-        "es"
-        "it"
-        "pt-latin9"
-        "br-abnt2"
-        "ru"
-        "pl"
-        "cz"
-        "hu"
-        "se"
-        "no"
-        "dk"
-        "fi"
-        "nl"
-        "be"
-        "ch"
-        "at"
-        "jp106"
-        "kr"
-        "tr"
-        "latam"
-        "dvorak"
-        "colemak"
     )
 
     local kb_selection=""
@@ -443,14 +389,14 @@ configure_hostname() {
     echo ""
 
     local hostname=""
-    hostname=$(gum input --placeholder "archlinux" --value "${CONFIG[hostname]}" --width 40 --header "Hostname:") || true
+    hostname=$(gum input --placeholder "donbaal" --value "${CONFIG[hostname]}" --width 40 --header "Hostname:") || true
 
     if [[ "$hostname" =~ ^[a-z][a-z0-9-]*$ && ${#hostname} -le 63 ]]; then
         CONFIG[hostname]="$hostname"
         show_success "Hostname: ${CONFIG[hostname]}"
     elif [[ -n "$hostname" ]]; then
-        show_warning "Invalid hostname, using default: archlinux"
-        CONFIG[hostname]="archlinux"
+        show_warning "Invalid hostname, using default: donbaal"
+        CONFIG[hostname]="donbaal"
     fi
 
     sleep 0.5
@@ -518,7 +464,7 @@ configure_authentication() {
     echo ""
 
     local username=""
-    username=$(gum input --placeholder "username" --width 40 --header "Username (lowercase):") || true
+    username=$(gum input --placeholder "baal" --value "${CONFIG[username]}" --width 40 --header "Username (lowercase):") || true
 
     if [[ ! "$username" =~ ^[a-z_][a-z0-9_-]*$ || ${#username} -gt 32 || -z "$username" ]]; then
         show_warning "Invalid username. Using 'user'"
@@ -619,7 +565,7 @@ select_desktop() {
     show_submenu_header "9. Desktop Environment"
     echo ""
 
-    show_info "Select your desktop environment"
+    show_info "Select your desktop environment(s) - Use SPACE to select multiple, ENTER to confirm"
     echo ""
 
     local desktops=(
@@ -633,14 +579,15 @@ select_desktop() {
     )
 
     local desktop_selection=""
-    desktop_selection=$(printf '%s\n' "${desktops[@]}" | gum choose --height 9 --header "Desktop:") || true
+    desktop_selection=$(printf '%s\n' "${desktops[@]}" | gum choose --no-limit --height 9 --header "Desktop(s):") || true
 
     if [[ -n "$desktop_selection" ]]; then
-        CONFIG[desktop]=$(echo "$desktop_selection" | awk '{print $1}')
-        show_success "Desktop: ${CONFIG[desktop]}"
+        # Convert multi-line selection to comma-separated list
+        CONFIG[desktop]=$(echo "$desktop_selection" | awk '{print $1}' | tr '\n' ',' | sed 's/,$//')
+        show_success "Desktop(s): ${CONFIG[desktop]}"
 
-        # If no desktop selected, set display manager to none
-        if [[ "${CONFIG[desktop]}" == "none" ]]; then
+        # If no desktop selected or "none" selected, set display manager to none
+        if [[ "${CONFIG[desktop]}" == "none" || -z "${CONFIG[desktop]}" ]]; then
             CONFIG[display_manager]="none"
             show_info "Display manager set to: none (TTY only)"
         fi
@@ -666,14 +613,17 @@ select_display_manager() {
     show_info "Select your display manager (login screen)"
     echo ""
 
-    # Set smart defaults based on desktop
+    # Set smart defaults based on desktop(s)
     local recommended=""
-    case "${CONFIG[desktop]}" in
-        "kde-plasma") recommended="sddm" ;;
-        "gnome") recommended="gdm" ;;
-        "hyprland"|"niri") recommended="greetd" ;;
-        *) recommended="ly" ;;
-    esac
+    if [[ "${CONFIG[desktop]}" == *"hyprland"* || "${CONFIG[desktop]}" == *"niri"* ]]; then
+        recommended="greetd"
+    elif [[ "${CONFIG[desktop]}" == *"kde-plasma"* ]]; then
+        recommended="sddm"
+    elif [[ "${CONFIG[desktop]}" == *"gnome"* ]]; then
+        recommended="gdm"
+    else
+        recommended="ly"
+    fi
 
     local display_managers=(
         "ly           | Minimal TUI greeter (works with all)"
@@ -837,9 +787,11 @@ show_main_menu() {
             " 6. Graphics Driver       | ${CONFIG[gfx_driver]}"
             " 7. Authentication        | ${CONFIG[username]:-Not configured}"
             " 8. Timezone              | ${CONFIG[timezone]}"
-            " 9. DCLI Config Format    | $config_display"
+            " 9. Desktop Environment   | ${CONFIG[desktop]//,/, }"
+            "10. Display Manager       | ${CONFIG[display_manager]}"
+            "11. DCLI Config Format    | $config_display"
             "-------------------------------------------"
-            "10. Start Installation"
+            "12. Start Installation"
             " 0. Exit"
         )
 
@@ -855,8 +807,10 @@ show_main_menu() {
             *" 6."*) select_graphics_driver ;;
             *" 7."*) configure_authentication ;;
             *" 8."*) select_timezone ;;
-            *" 9."*) select_config_format ;;
-            *"10."*)
+            *" 9."*) select_desktop_environment ;;
+            *"10."*) select_display_manager ;;
+            *"11."*) select_config_format ;;
+            *"12."*)
                 if validate_config; then
                     show_summary
                     if confirm_action "Start installation? THIS WILL ERASE ${CONFIG[disk]}"; then
@@ -1224,30 +1178,33 @@ install_critical_packages() {
             ;;
     esac
 
-    # Desktop environment
-    case "${CONFIG[desktop]}" in
-        kde-plasma)
-            packages+=" plasma-meta kde-applications-meta konsole dolphin"
-            ;;
-        gnome)
-            packages+=" gnome gnome-extra gnome-tweaks"
-            ;;
-        hyprland)
-            packages+=" hyprland xdg-desktop-portal-hyprland waybar wofi dunst foot thunar"
-            ;;
-        niri)
-            packages+=" niri xdg-desktop-portal-gtk xdg-desktop-portal-gnome waybar fuzzel rofi-wayland mako foot alacritty thunar udiskie xwayland-satellite"
-            ;;
-        i3)
-            packages+=" i3-wm i3status i3lock dmenu xorg-server xorg-xinit alacritty thunar picom"
-            ;;
-        xfce)
-            packages+=" xfce4 xfce4-goodies xorg-server xorg-xinit"
-            ;;
-        none)
-            packages+=" tmux htop"
-            ;;
-    esac
+    # Desktop environment(s) - support multiple selections
+    IFS=',' read -ra DESKTOPS <<< "${CONFIG[desktop]}"
+    for desktop in "${DESKTOPS[@]}"; do
+        case "$desktop" in
+            kde-plasma)
+                packages+=" plasma-meta kde-applications-meta konsole dolphin"
+                ;;
+            gnome)
+                packages+=" gnome gnome-extra gnome-tweaks"
+                ;;
+            hyprland)
+                packages+=" hyprland xdg-desktop-portal-hyprland waybar wofi dunst foot thunar"
+                ;;
+            niri)
+                packages+=" niri xdg-desktop-portal-gtk xdg-desktop-portal-gnome waybar fuzzel rofi-wayland mako foot alacritty thunar udiskie xwayland-satellite"
+                ;;
+            i3)
+                packages+=" i3-wm i3status i3lock dmenu xorg-server xorg-xinit alacritty thunar picom"
+                ;;
+            xfce)
+                packages+=" xfce4 xfce4-goodies xorg-server xorg-xinit"
+                ;;
+            none)
+                packages+=" tmux htop"
+                ;;
+        esac
+    done
 
     # Display manager
     case "${CONFIG[display_manager]}" in
@@ -1422,8 +1379,12 @@ generate_dcli_config() {
 
     modules_to_copy+=("modules/gpu/${CONFIG[gfx_driver]}.lua")
 
+    # Copy all selected desktop modules
     if [[ "${CONFIG[desktop]}" != "none" ]]; then
-        modules_to_copy+=("modules/desktops/${CONFIG[desktop]}.lua")
+        IFS=',' read -ra DESKTOPS <<< "${CONFIG[desktop]}"
+        for desktop in "${DESKTOPS[@]}"; do
+            modules_to_copy+=("modules/desktops/${desktop}.lua")
+        done
     fi
 
     if [[ "${CONFIG[display_manager]}" != "none" ]]; then
