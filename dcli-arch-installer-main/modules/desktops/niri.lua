@@ -24,6 +24,8 @@ return {
 
         -- Terminal
         "alacritty",
+        "foot",
+        "kitty",
 
         -- File manager
         "thunar",
@@ -35,6 +37,7 @@ return {
         "grim",
         "slurp",
         "wl-clipboard",
+        "satty",
 
         -- Wallpaper
         "swaybg",
@@ -48,6 +51,12 @@ return {
 
         -- Network manager applet
         "network-manager-applet",
+        
+        -- Brightness control
+        "brightnessctl",
+        
+        -- Clipboard management
+        "cliphist",
 
         -- X11 support
         "xwayland-satellite",
@@ -55,6 +64,11 @@ return {
         -- Qt Wayland
         "qt5-wayland",
         "qt6-wayland",
+    },
+    
+    aur_packages = {
+        "wl-clip-persist",
+        "sway-audio-idle-inhibit-git",
     },
 
     services = {

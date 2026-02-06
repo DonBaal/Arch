@@ -7,7 +7,9 @@ return {
     packages = {
         -- Core
         "hyprland",
+        "hypridle",
         "xdg-desktop-portal-hyprland",
+        "xdg-desktop-portal-gtk",
         
         -- Status bar
         "waybar",
@@ -48,9 +50,20 @@ return {
         -- Network manager applet
         "network-manager-applet",
         
+        -- Display management
+        "nwg-displays",
+        
+        -- Brightness & Audio control
+        "brightnessctl",
+        "pavucontrol",
+        
         -- Qt Wayland
         "qt5-wayland",
         "qt6-wayland",
+    },
+    
+    aur_packages = {
+        "grimblast-git",
     },
     
     services = {

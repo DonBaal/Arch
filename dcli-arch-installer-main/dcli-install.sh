@@ -931,6 +931,10 @@ perform_installation() {
     setup_dcli
     show_success "DCLI configured"
 
+    show_info "Deploying compositor configurations..."
+    deploy_donarch_configs
+    show_success "Configurations deployed"
+
     run_step "Creating first-boot service..." create_first_boot_service
 
     echo ""
@@ -1129,7 +1133,7 @@ install_critical_packages() {
     local packages=""
 
     # Base utilities
-    packages+=" vim nano"
+    packages+=" vim nano jq"
 
     # Bootloader
     packages+=" grub efibootmgr os-prober"
@@ -1190,9 +1194,13 @@ install_critical_packages() {
                 ;;
             hyprland)
                 packages+=" hyprland xdg-desktop-portal-hyprland waybar wofi dunst foot thunar"
+                packages+=" grim slurp wl-clipboard swaybg swaylock swayidle polkit-gnome network-manager-applet"
+                packages+=" brightnessctl playerctl pavucontrol nwg-look qt5ct qt6ct"
                 ;;
             niri)
                 packages+=" niri xdg-desktop-portal-gtk xdg-desktop-portal-gnome waybar fuzzel rofi-wayland mako foot alacritty thunar udiskie xwayland-satellite"
+                packages+=" grim slurp wl-clipboard swaybg swaylock swayidle polkit-gnome network-manager-applet"
+                packages+=" brightnessctl playerctl pavucontrol nwg-look qt5ct qt6ct"
                 ;;
             i3)
                 packages+=" i3-wm i3status i3lock dmenu xorg-server xorg-xinit alacritty thunar picom"
@@ -1310,6 +1318,158 @@ install_bootloader() {
 }
 
 # ════════════════════════════════════════════════════════════════════════════════
+# DONARCH CONFIGURATIONS DEPLOYMENT
+# ════════════════════════════════════════════════════════════════════════════════
+
+deploy_donarch_configs() {
+    local user_home="$MOUNTPOINT/home/${CONFIG[username]}"
+    local config_dir="$user_home/.config"
+    local donarch_source="$SCRIPT_DIR/../donarch-master"
+    
+    # Check if donarch-master exists
+    if [[ ! -d "$donarch_source" ]]; then
+        show_warning "donarch-master not found at $donarch_source, skipping config deployment"
+        return 0
+    fi
+    
+    IFS=',' read -ra DESKTOPS <<< "${CONFIG[desktop]}"
+    local has_hyprland=false
+    local has_niri=false
+    
+    for desktop in "${DESKTOPS[@]}"; do
+        [[ "$desktop" == "hyprland" ]] && has_hyprland=true
+        [[ "$desktop" == "niri" ]] && has_niri=true
+    done
+    
+    # Deploy assets
+    if [[ -d "$donarch_source/assets" ]]; then
+        show_info "Deploying assets..."
+        mkdir -p "$config_dir/donarch"
+        cp -r "$donarch_source/assets" "$config_dir/donarch/"
+    fi
+    
+    # Deploy shared configs
+    show_info "Deploying shared configurations..."
+    local shared_configs=("kitty" "fish" "gtk-3.0" "gtk-4.0" "fastfetch" "noctalia")
+    
+    for config in "${shared_configs[@]}"; do
+        if [[ -d "$donarch_source/configs/shared/$config" ]]; then
+            mkdir -p "$config_dir/$config"
+            cp -r "$donarch_source/configs/shared/$config"/* "$config_dir/$config/"
+        fi
+    done
+    
+    # Handle Qt configs with HOME variable substitution
+    for qt_config in "qt5ct" "qt6ct"; do
+        if [[ -d "$donarch_source/configs/shared/$qt_config" ]]; then
+            mkdir -p "$config_dir/$qt_config"
+            if [[ -f "$donarch_source/configs/shared/$qt_config/${qt_config}.conf" ]]; then
+                sed "s|\$HOME|/home/${CONFIG[username]}|g" \
+                    "$donarch_source/configs/shared/$qt_config/${qt_config}.conf" \
+                    > "$config_dir/$qt_config/${qt_config}.conf"
+            fi
+        fi
+    done
+    
+    # Deploy Hyprland configs
+    if [[ "$has_hyprland" == "true" && -d "$donarch_source/configs/hyprland" ]]; then
+        show_info "Deploying Hyprland configurations..."
+        if [[ -d "$donarch_source/configs/hyprland/hypr" ]]; then
+            mkdir -p "$config_dir/hypr"
+            cp -r "$donarch_source/configs/hyprland/hypr"/* "$config_dir/hypr/"
+        fi
+        
+        # Deploy DMS configs for Hyprland
+        if [[ -d "$donarch_source/configs/hyprland/DankMaterialShell" ]]; then
+            mkdir -p "$config_dir/DankMaterialShell"
+            cp -r "$donarch_source/configs/hyprland/DankMaterialShell"/* "$config_dir/DankMaterialShell/"
+        fi
+    fi
+    
+    # Deploy Niri configs
+    if [[ "$has_niri" == "true" && -d "$donarch_source/configs/niri" ]]; then
+        show_info "Deploying Niri configurations..."
+        if [[ -d "$donarch_source/configs/niri/niri" ]]; then
+            mkdir -p "$config_dir/niri"
+            cp -r "$donarch_source/configs/niri/niri"/* "$config_dir/niri/"
+        fi
+        
+        # Deploy DMS configs for Niri (if Hyprland not installed)
+        if [[ "$has_hyprland" != "true" && -d "$donarch_source/configs/niri/DankMaterialShell" ]]; then
+            mkdir -p "$config_dir/DankMaterialShell"
+            cp -r "$donarch_source/configs/niri/DankMaterialShell"/* "$config_dir/DankMaterialShell/"
+        fi
+    fi
+    
+    # Also copy shared DMS configs if they exist
+    if [[ -d "$donarch_source/configs/shared/DankMaterialShell" ]]; then
+        mkdir -p "$config_dir/DankMaterialShell"
+        cp -r "$donarch_source/configs/shared/DankMaterialShell"/* "$config_dir/DankMaterialShell/" 2>/dev/null || true
+    fi
+    
+    # Fix permissions
+    arch-chroot "$MOUNTPOINT" chown -R "${CONFIG[username]}:${CONFIG[username]}" "/home/${CONFIG[username]}/.config"
+    
+    # Configure greetd with DMS if greetd is selected
+    if [[ "${CONFIG[display_manager]}" == "greetd" && ("$has_hyprland" == "true" || "$has_niri" == "true") ]]; then
+        configure_greetd_dms "$has_hyprland" "$has_niri"
+    fi
+}
+
+configure_greetd_dms() {
+    local has_hyprland="$1"
+    local has_niri="$2"
+    
+    show_info "Configuring greetd with DMS-greeter..."
+    
+    # Determine default command
+    local default_cmd="Hyprland"
+    if [[ "$has_hyprland" == "true" ]]; then
+        default_cmd="Hyprland"
+    elif [[ "$has_niri" == "true" ]]; then
+        default_cmd="niri-session"
+    fi
+    
+    # Create greetd config directory
+    mkdir -p "$MOUNTPOINT/etc/greetd"
+    
+    # Write greetd config with dms-greeter
+    cat > "$MOUNTPOINT/etc/greetd/config.toml" << EOF
+[terminal]
+vt = 1
+
+[default_session]
+command = "dms-greeter --command ${default_cmd}"
+user = "greeter"
+EOF
+    
+    # Create Wayland session files
+    mkdir -p "$MOUNTPOINT/usr/share/wayland-sessions"
+    
+    if [[ "$has_hyprland" == "true" ]]; then
+        cat > "$MOUNTPOINT/usr/share/wayland-sessions/hyprland-dms.desktop" << 'EOF'
+[Desktop Entry]
+Name=Hyprland (DMS)
+Comment=Hyprland with DankMaterialShell
+Exec=Hyprland
+Type=Application
+EOF
+    fi
+    
+    if [[ "$has_niri" == "true" ]]; then
+        cat > "$MOUNTPOINT/usr/share/wayland-sessions/niri-dms.desktop" << 'EOF'
+[Desktop Entry]
+Name=Niri (DMS)
+Comment=Niri with DankMaterialShell
+Exec=niri-session
+Type=Application
+EOF
+    fi
+    
+    show_success "DMS-greeter configured"
+}
+
+# ════════════════════════════════════════════════════════════════════════════════
 # DCLI SETUP
 # ════════════════════════════════════════════════════════════════════════════════
 
@@ -1323,6 +1483,20 @@ setup_dcli() {
 
     # Install dcli
     arch-chroot "$MOUNTPOINT" sudo -u "${CONFIG[username]}" "${CONFIG[aur_helper]}" -S --noconfirm dcli
+
+    # Install dms-greeter if greetd is selected with hyprland or niri
+    if [[ "${CONFIG[display_manager]}" == "greetd" ]]; then
+        IFS=',' read -ra DESKTOPS <<< "${CONFIG[desktop]}"
+        for desktop in "${DESKTOPS[@]}"; do
+            if [[ "$desktop" == "hyprland" || "$desktop" == "niri" ]]; then
+                show_info "Installing dms-greeter from AUR..."
+                arch-chroot "$MOUNTPOINT" sudo -u "${CONFIG[username]}" "${CONFIG[aur_helper]}" -S --noconfirm dms-greeter || {
+                    show_warning "Failed to install dms-greeter, will use tuigreet instead"
+                }
+                break
+            fi
+        done
+    fi
 
     # Setup config directory
     if [[ -n "${CONFIG[git_repo]}" ]]; then
