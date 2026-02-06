@@ -1601,7 +1601,10 @@ generate_lua_config() {
     fi
 
     if [[ "${CONFIG[desktop]}" != "none" ]]; then
-        enabled_modules+=("desktops/${CONFIG[desktop]}")
+        IFS=',' read -ra DESKTOPS <<< "${CONFIG[desktop]}"
+        for desktop in "${DESKTOPS[@]}"; do
+            enabled_modules+=("desktops/${desktop}")
+        done
     fi
 
     if [[ "${CONFIG[display_manager]}" != "none" ]]; then
@@ -1675,7 +1678,10 @@ generate_yaml_config() {
     fi
 
     if [[ "${CONFIG[desktop]}" != "none" ]]; then
-        enabled_modules+=("desktops/${CONFIG[desktop]}")
+        IFS=',' read -ra DESKTOPS <<< "${CONFIG[desktop]}"
+        for desktop in "${DESKTOPS[@]}"; do
+            enabled_modules+=("desktops/${desktop}")
+        done
     fi
 
     if [[ "${CONFIG[display_manager]}" != "none" ]]; then
